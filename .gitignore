@@ -17,3 +17,6 @@ structured_outputs/*.tmp
 # IDE
 .idea/
 .vscode/
+
+#debug folder
+image_generation_debug/

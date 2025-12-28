@@ -69,6 +69,10 @@
       gap: 10px;
       min-height: 0;
     }
+    .left-column.map-collapsed { grid-template-rows: 46px 1fr; }
+    .left-column.map-collapsed .map-wrapper { min-height: 46px; }
+    .left-column.map-collapsed #map { display: none; }
+    .left-column.map-collapsed .map-wrapper .panel-header { border-bottom: none; }
     .panel {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -80,6 +84,7 @@
       box-shadow: 0 8px 18px rgba(0,0,0,0.25);
       overflow: hidden;
     }
+    #summary-panel { flex: 1; min-height: 0; }
     #map {
       width: 100%;
       height: 100%;
@@ -87,6 +92,8 @@
       border: 1px solid var(--border-strong);
     }
     .map-wrapper { position: relative; min-height: 300px; }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .panel-title { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
     .marker { width: 16px; height: 16px; border-radius: 50%; background: #1f2937; border: 2px solid var(--accent); }
     .conf-high { border-style: solid; }
     .conf-medium { border-style: dashed; }
@@ -106,6 +113,14 @@
     .check-item input { accent-color: var(--uscg-red); }
     .footer-box { background: #0d1421; border: 1px dashed var(--border); border-radius: var(--radius); padding: 10px 12px; font-size: 12px; color: var(--muted); }
     .state-msg { color: var(--muted); font-size: 13px; padding: 12px; }
+    .nano-section { flex: 1; min-height: 0; overflow: auto; }
+    #nano-output { max-height: none; overflow: visible; }
+    .nano-images { display: grid; gap: 8px; flex: 1; min-height: 0; overflow: auto; padding-right: 4px; }
+    .nano-image { width: 100%; height: auto; object-fit: contain; border: 1px solid #ccc; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .section-toggle { background: transparent; border: 1px solid var(--border-strong); color: var(--muted); padding: 4px 8px; border-radius: 6px; font-size: 10px; letter-spacing: 0.06em; }
+    .section-toggle:hover { border-color: var(--uscg-red); color: var(--text); }
+    .section-collapsed .stage2-body { display: none; }
     .controls { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12px; }
     button { background: #132138; color: var(--text); border: 1px solid var(--border-strong); padding: 7px 12px; border-radius: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; }
     button:hover { border-color: var(--uscg-red); }
@@ -138,14 +153,23 @@
     </div>
     <div class="left-column">
       <div class="panel map-wrapper">
+        <div class="panel-header">
+          <div class="panel-title">Incident Map</div>
+          <button class="section-toggle" id="toggle-map" type="button">Collapse</button>
+        </div>
         <div id="map"></div>
       </div>
       <div class="panel" id="summary-panel">
-        <div class="section">
-          <h3>Situational Context (Stage 2)</h3>
-          <div id="stage2-overview" class="state-msg">Select an incident to view situational context.</div>
+        <div class="section" id="stage2-section">
+          <div class="section-header">
+            <h3>Situational Context (Stage 2)</h3>
+            <button class="section-toggle" id="toggle-stage2" type="button">Collapse</button>
+          </div>
+          <div class="stage2-body" id="stage2-body">
+            <div id="stage2-overview" class="state-msg">Select an incident to view situational context.</div>
+          </div>
         </div>
-        <div class="section">
+        <div class="section nano-section">
           <h3>Plausible Scenario Visualization</h3>
           <div class="footer-box">Hypothetical · Not Evidence · Not Ground Truth</div>
           <div id="nano-output" class="state-msg">Select a scenario to visualize.</div>
@@ -184,6 +208,7 @@
     // Optional: point this to a backend extractor; fallback uses precomputed structured outputs.
     const API_ROOT = "http://localhost:8000";
     const ANALYZE_ENDPOINT = `${API_ROOT}/analyze`;
+    const NANOBANANA_ENDPOINT = `${API_ROOT}/nanobanana/generate`;
 
     const DEFAULT_INCIDENTS = [
       {
@@ -557,6 +582,58 @@
       return analyzed;
     }
 
+    function renderNanoResult(result) {
+      const nano = get("nano-output");
+      if (!nano) return;
+      if (!result) {
+        nano.innerHTML = "Select a scenario to visualize.";
+        return;
+      }
+      const overlay = result.overlay_label || "Plausible Scenario Visualization — Hypothetical · Not Evidence · Not Ground Truth";
+      const imgs = (result.gemini_images || []).filter(i => i.image_base64);
+      const imgHtml = imgs.length
+        ? imgs.map(i => `<img class="nano-image" alt="NanoBanana render ${i.index}" src="data:${i.mime_type || "image/png"};base64,${i.image_base64}">`).join("")
+        : "<div class=\"state-msg\">No images returned.</div>";
+      nano.innerHTML = `
+        <div class="overlay-label">${overlay}</div>
+        <div class="nano-meta">Scenario: ${result.selected_scenario || ""}</div>
+        <div class="nano-meta">Model: ${result.gemini_model || ""}</div>
+        <div class="nano-images">${imgHtml}</div>
+      `;
+    }
+
+    async function runNanoVisualization(scenario) {
+      if (!scenario || !selectedId) return;
+      const incident = incidents.find(i => i._id === selectedId);
+      if (!incident) return;
+      const nano = get("nano-output");
+      if (nano) nano.textContent = "Generating hypothetical visualization…";
+
+      // Ensure Stage 2 cache exists
+      if (!structuredCache[selectedId]) {
+        await runExtraction(incident);
+      }
+      // If still no cache, bail
+      if (!structuredCache[selectedId]) {
+        if (nano) nano.textContent = "No situational context available.";
+        return;
+      }
+
+      try {
+        const res = await fetch(NANOBANANA_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source_path: incident.source, scenario })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderNanoResult(data);
+      } catch (e) {
+        console.error("NanoBanana generation failed", e);
+        if (nano) nano.textContent = "Visualization unavailable.";
+      }
+    }
+
     async function runExtraction(incident) {
       loadGrounding(incident);
       const details = get("details-content");
@@ -632,6 +709,28 @@
           // Download disabled per request; this button now simply keeps the panel visible.
         });
       }
+      const toggleStage2 = get("toggle-stage2");
+      if (toggleStage2) {
+        toggleStage2.addEventListener("click", () => {
+          const section = get("stage2-section");
+          if (!section) return;
+          section.classList.toggle("section-collapsed");
+          toggleStage2.textContent = section.classList.contains("section-collapsed")
+            ? "Expand"
+            : "Collapse";
+        });
+      }
+      const toggleMap = get("toggle-map");
+      if (toggleMap) {
+        toggleMap.addEventListener("click", () => {
+          const leftColumn = document.querySelector(".left-column");
+          if (!leftColumn) return;
+          leftColumn.classList.toggle("map-collapsed");
+          toggleMap.textContent = leftColumn.classList.contains("map-collapsed")
+            ? "Expand"
+            : "Collapse";
+        });
+      }
       document.addEventListener("change", (e) => {
         if (e.target && e.target.name === "scenario") {
           const scenario = e.target.dataset.scenario;
@@ -640,6 +739,9 @@
             nano.textContent = scenario
               ? `Rendering hypothetical visualization for: ${scenario}`
               : "Select a scenario to visualize.";
+          }
+          if (scenario) {
+            runNanoVisualization(scenario);
           }
         }
       });
