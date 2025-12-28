@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# OS
+.DS_Store
+
+# Node / frontend
+node_modules/
+*.log
+
+# Artifacts
+structured_outputs/*.tmp
+
+# IDE
+.idea/
+.vscode/

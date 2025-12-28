@@ -1,0 +1,77 @@
+{
+  "incident_classification": {
+    "case_type": "suspicious_activity",
+    "confidence": "medium"
+  },
+  "time_context": {
+    "report_time_local": "02:17 PDT",
+    "time_since_incident": "unknown"
+  },
+  "location_context": {
+    "lat": 32.6624,
+    "lon": -117.2917,
+    "relative_description": "~6 NM west of Point Loma",
+    "offshore": true,
+    "distance_from_shore_nm": 6.0,
+    "navigational_zone": "open_coastal_water"
+  },
+  "control_state": {
+    "maneuverable": "unknown",
+    "stability_compromised": false,
+    "propulsion_status": "unknown"
+  },
+  "environment": {
+    "sea_state_ft": "3-4",
+    "wave_period": "unknown",
+    "wind": {
+      "direction": "unknown",
+      "speed_kts": "10-15"
+    },
+    "visibility": "unknown",
+    "water_temp_f": null
+  },
+  "observations": {
+    "debris_observed": false,
+    "debris_types": [],
+    "persons_visible": false
+  },
+  "human_risk_context": {
+    "occupant_count": "unknown",
+    "children_present": "unknown",
+    "hypothermia_risk": false
+  },
+  "primary_risk_vectors": [
+    {
+      "risk_type": "collision_risk",
+      "driver": "lack of visibility (no nav lights, low lighting)",
+      "severity": "high"
+    },
+    {
+      "risk_type": "possible_capsize",
+      "driver": "heavy overloading and low freeboard",
+      "severity": "high"
+    }
+  ],
+  "uncertainties": [
+    "confidence_downgraded_due_to_insufficient_corroboration",
+    "debris_observed",
+    "maneuverable",
+    "minors_onboard",
+    "passenger_count",
+    "persons_visible",
+    "propulsion_status",
+    "report_time_timezone",
+    "stability_compromised",
+    "vessel_condition",
+    "visibility",
+    "water_temp_f",
+    "wave_period",
+    "wind_direction"
+  ],
+  "prohibited_inferences": [
+    "cause of overloading",
+    "intent of occupants",
+    "stability_compromised (without debris and violent motion)",
+    "vessel safety beyond stated risks"
+  ]
+}

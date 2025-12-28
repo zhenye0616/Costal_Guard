@@ -1,0 +1,14 @@
+{
+  "case_type": "overloaded_small_vessel",
+  "lat": 32.6624,
+  "lon": -117.2917,
+  "time_local": "02:17",
+  "location_note": "~6 NM west of Point Loma",
+  "environment": {
+    "sea_state_ft": "3-4",
+    "wind_kts": "10-15",
+    "lighting": "low"
+  },
+  "indicators": ["no_nav_lights", "low_freeboard", "heavy_overloading"],
+  "uncertainties": ["passenger_count", "minors_onboard", "vessel_condition"]
+}

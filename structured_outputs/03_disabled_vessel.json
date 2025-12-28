@@ -1,0 +1,66 @@
+{
+  "incident_classification": {
+    "case_type": "disabled_vessel",
+    "confidence": "medium"
+  },
+  "time_context": {
+    "report_time_local": "13:48 PDT",
+    "time_since_incident": "unknown"
+  },
+  "location_context": {
+    "lat": 37.8041,
+    "lon": -122.6402,
+    "relative_description": "~2.5 NM west of Golden Gate Bridge",
+    "offshore": true,
+    "distance_from_shore_nm": 2.5,
+    "navigational_zone": "traffic_separation_scheme"
+  },
+  "control_state": {
+    "maneuverable": "no",
+    "stability_compromised": false,
+    "propulsion_status": "lost"
+  },
+  "environment": {
+    "sea_state_ft": "2-3",
+    "wave_period": "unknown",
+    "wind": {
+      "direction": "unknown",
+      "speed_kts": "15"
+    },
+    "visibility": "good",
+    "water_temp_f": null
+  },
+  "observations": {
+    "debris_observed": false,
+    "debris_types": [],
+    "persons_visible": false
+  },
+  "human_risk_context": {
+    "occupant_count": "unknown",
+    "children_present": "unknown",
+    "hypothermia_risk": false
+  },
+  "primary_risk_vectors": [
+    {
+      "risk_type": "loss_of_control",
+      "driver": "loss of propulsion",
+      "severity": "medium"
+    },
+    {
+      "risk_type": "collision_risk",
+      "driver": "drift toward shipping lanes",
+      "severity": "high"
+    }
+  ],
+  "uncertainties": [
+    "anchor_status",
+    "confidence_downgraded_due_to_insufficient_corroboration",
+    "drift_rate",
+    "mechanical_condition",
+    "persons_visible",
+    "report_time_timezone"
+  ],
+  "prohibited_inferences": [
+    "none identified"
+  ]
+}

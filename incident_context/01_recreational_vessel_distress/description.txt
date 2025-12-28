@@ -1,0 +1,19 @@
+Recreational Vessel Distress / Possible Capsize
+Location: Santa Barbara Channel (~4 NM south of Coal Oil Point, CA)
+Trigger: VHF relay from nearby vessel at 1642 PST
+
+Report:
+- Small white center-console hit by wave and rolled hard; unknown if fully capsized
+- Floating cooler and fishing gear observed
+- No persons visible
+
+Environmental snapshot:
+- Seas 4–5 ft, short period
+- Wind WNW 12–15 kts
+- Visibility good
+- Water temp ~56°F
+
+Uncertainties:
+- Occupant count
+- Vessel orientation (turtled vs swamped)
+- Time since incident

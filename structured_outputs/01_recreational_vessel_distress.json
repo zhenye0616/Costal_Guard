@@ -1,0 +1,81 @@
+{
+  "incident_classification": {
+    "case_type": "recreational_vessel_distress",
+    "confidence": "medium"
+  },
+  "time_context": {
+    "report_time_local": "16:42 PDT",
+    "time_since_incident": "unknown"
+  },
+  "location_context": {
+    "lat": 34.4062,
+    "lon": -119.8783,
+    "relative_description": "~4 NM south of Coal Oil Point, CA",
+    "offshore": true,
+    "distance_from_shore_nm": 4.0,
+    "navigational_zone": "open_coastal_water"
+  },
+  "control_state": {
+    "maneuverable": "unknown",
+    "stability_compromised": true,
+    "propulsion_status": "unknown"
+  },
+  "environment": {
+    "sea_state_ft": "4-5",
+    "wave_period": "unknown",
+    "wind": {
+      "direction": "unknown",
+      "speed_kts": "12-15"
+    },
+    "visibility": "good",
+    "water_temp_f": 56
+  },
+  "observations": {
+    "debris_observed": true,
+    "debris_types": [
+      "floating_debris"
+    ],
+    "persons_visible": false
+  },
+  "human_risk_context": {
+    "occupant_count": "unknown",
+    "children_present": "unknown",
+    "hypothermia_risk": true
+  },
+  "primary_risk_vectors": [
+    {
+      "risk_type": "hypothermia",
+      "driver": "cold water, possible persons in water",
+      "severity": "high"
+    },
+    {
+      "risk_type": "loss_of_control",
+      "driver": "vessel orientation unknown, floating debris",
+      "severity": "medium"
+    },
+    {
+      "risk_type": "possible_capsize",
+      "driver": "vessel orientation unknown, floating debris",
+      "severity": "medium"
+    }
+  ],
+  "uncertainties": [
+    "children_present",
+    "maneuverable",
+    "occupant_count",
+    "persons_in_water",
+    "persons_visible",
+    "propulsion_status",
+    "report_time_timezone",
+    "time_since_incident",
+    "vessel_orientation",
+    "wave_period",
+    "wind_direction"
+  ],
+  "prohibited_inferences": [
+    "causes",
+    "intent",
+    "outcomes",
+    "safety"
+  ]
+}

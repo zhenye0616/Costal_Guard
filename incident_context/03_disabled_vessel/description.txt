@@ -1,0 +1,19 @@
+Disabled Vessel / Loss of Propulsion
+Location: ~2.5 NM west of Golden Gate Bridge (San Francisco TSS)
+Trigger: VHF distress call at 1348 PST
+
+Report:
+- Lost engine power and drifting
+- Two adults and one child onboard
+- Drifting toward shipping lanes
+
+Environmental snapshot:
+- Seas 2–3 ft
+- Wind W 15 kts
+- Visibility excellent
+- Traffic heavy
+
+Uncertainties:
+- Anchor status
+- Drift rate
+- Mechanical condition

@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Incident Context — Extracted Operational Data (v1)</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --panel-strong: #0d1626;
+      --border: #1f2a3a;
+      --border-strong: #2b3b52;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --faint: #6b7280;
+      --accent: #60a5fa;
+      --uscg-red: #e11d48;
+      --warning: #f59e0b;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      background:
+        linear-gradient(135deg, rgba(13, 21, 36, 0.9) 0%, rgba(11, 18, 32, 0.9) 100%),
+        #0b1220;
+      color: var(--text);
+      padding: 16px;
+    }
+    .shell {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 12px;
+      height: 100vh;
+      max-height: calc(100vh - 32px);
+      grid-template-rows: auto 1fr;
+    }
+    .topline {
+      grid-column: 1 / span 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--panel-strong);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .left-column {
+      display: grid;
+      grid-template-rows: 1.6fr 1.4fr;
+      gap: 10px;
+      min-height: 0;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-strong);
+    }
+    .map-wrapper { position: relative; min-height: 300px; }
+    .marker { width: 16px; height: 16px; border-radius: 50%; background: #1f2937; border: 2px solid var(--accent); }
+    .conf-high { border-style: solid; }
+    .conf-medium { border-style: dashed; }
+    .conf-low { border-style: dotted; }
+    .details { overflow: auto; }
+    .section { padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); background: #0d1626; margin-bottom: 8px; }
+    .section h3 { margin: 0 0 6px 0; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); border-left: 3px solid var(--uscg-red); padding-left: 8px; }
+    .row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .label { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .value { color: var(--text); font-weight: 600; font-size: 13px; text-align: right; }
+    .list-label { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin: 6px 0 4px 0; }
+    ul, ol { margin: 0; padding-left: 18px; color: var(--text); font-size: 13px; }
+    .flag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 10px; border: 1px dashed var(--border-strong); background: #10192b; font-size: 12px; }
+    .flag .icon { color: var(--warning); }
+    .checklist { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px; }
+    .check-item { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+    .check-item input { accent-color: var(--uscg-red); }
+    .footer-box { background: #0d1421; border: 1px dashed var(--border); border-radius: var(--radius); padding: 10px 12px; font-size: 12px; color: var(--muted); }
+    .state-msg { color: var(--muted); font-size: 13px; padding: 12px; }
+    .controls { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12px; }
+    button { background: #132138; color: var(--text); border: 1px solid var(--border-strong); padding: 7px 12px; border-radius: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; }
+    button:hover { border-color: var(--uscg-red); }
+    .raw-report {
+      background: #0e1b2c;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      white-space: pre-wrap;
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: var(--text);
+      line-height: 1.5;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+      max-height: 220px;
+      overflow: auto;
+    }
+    .state-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 12px; background: #111a2b; border: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+    @media (max-width: 1100px) {
+      .shell { grid-template-columns: 1fr; height: auto; }
+      .left-column { grid-template-rows: 1fr 0.8fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="topline">
+      <span>USCG — Extracted Operational Data</span>
+      <span>Extraction Only · No Automation</span>
+    </div>
+    <div class="left-column">
+      <div class="panel map-wrapper">
+        <div id="map"></div>
+      </div>
+      <div class="panel" id="summary-panel">
+        <div class="section">
+          <h3>Situational Context (Stage 2)</h3>
+          <div id="stage2-overview" class="state-msg">Select an incident to view situational context.</div>
+        </div>
+        <div class="section">
+          <h3>Plausible Scenario Visualization</h3>
+          <div class="footer-box">Hypothetical · Not Evidence · Not Ground Truth</div>
+          <div id="nano-output" class="state-msg">Select a scenario to visualize.</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel details">
+      <div class="controls">
+        <button id="run-extract-btn">Incident Analysis</button>
+      </div>
+      <div id="details-content" class="state-msg">Select an incident on the map to view details.</div>
+      <div id="temporal-section" class="section">
+        <h3>Temporal Framing</h3>
+        <div id="temporal-panel" class="state-msg">No temporal signals yet.</div>
+      </div>
+      <div id="factors-section" class="section">
+        <h3>Situational Factors</h3>
+        <div id="factors-panel" class="state-msg">No situational factors yet.</div>
+      </div>
+      <div id="constraints-section" class="section">
+        <h3>Operational Constraints</h3>
+        <div id="constraints-panel" class="state-msg">No constraints yet.</div>
+      </div>
+      <div id="scenarios-section" class="section">
+        <h3>Plausible Scenarios</h3>
+        <div id="scenarios-panel" class="state-msg">No scenarios yet.</div>
+      </div>
+      <div id="grounding-panel" class="section">
+        <h3>Stage 1 — Extracted Observations</h3>
+        <pre class="raw-report" id="grounding-raw"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Optional: point this to a backend extractor; fallback uses precomputed structured outputs.
+    const API_ROOT = "http://localhost:8000";
+    const ANALYZE_ENDPOINT = `${API_ROOT}/analyze`;
+
+    const DEFAULT_INCIDENTS = [
+      {
+        _id: "01_recreational_vessel_distress",
+        source: "incident_context/01_recreational_vessel_distress/description.txt",
+        structured_path: "structured_outputs/01_recreational_vessel_distress.json",
+        raw_path: "incident_context/01_recreational_vessel_distress/description.txt",
+        incident_classification: { case_type: "recreational_vessel_distress", confidence: "medium" },
+        time_context: { report_time_local: "16:42 PDT", time_since_incident: "unknown" },
+        location_context: {
+          lat: 34.4062, lon: -119.8783,
+          relative_description: "~4 NM south of Coal Oil Point, CA",
+          offshore: true, distance_from_shore_nm: 4.0, navigational_zone: "open_coastal_water"
+        }
+      },
+      {
+        _id: "02_overloaded_small_vessel",
+        source: "incident_context/02_overloaded_small_vessel/description.txt",
+        structured_path: "structured_outputs/02_overloaded_small_vessel.json",
+        raw_path: "incident_context/02_overloaded_small_vessel/description.txt",
+        incident_classification: { case_type: "suspicious_activity", confidence: "medium" },
+        time_context: { report_time_local: "02:17 PDT", time_since_incident: "unknown" },
+        location_context: {
+          lat: 32.6624, lon: -117.2917,
+          relative_description: "~6 NM west of Point Loma",
+          offshore: true, distance_from_shore_nm: 6.0, navigational_zone: "open_coastal_water"
+        }
+      },
+      {
+        _id: "03_disabled_vessel",
+        source: "incident_context/03_disabled_vessel/description.txt",
+        structured_path: "structured_outputs/03_disabled_vessel.json",
+        raw_path: "incident_context/03_disabled_vessel/description.txt",
+        incident_classification: { case_type: "disabled_vessel", confidence: "medium" },
+        time_context: { report_time_local: "13:48 PDT", time_since_incident: "unknown" },
+        location_context: {
+          lat: 37.8041, lon: -122.6402,
+          relative_description: "~2.5 NM west of Golden Gate Bridge",
+          offshore: true, distance_from_shore_nm: 2.5, navigational_zone: "traffic_separation_scheme"
+        }
+      },
+      {
+        _id: "04_person_in_water",
+        source: "incident_context/04_person_in_water/description.txt",
+        structured_path: "structured_outputs/04_person_in_water.json",
+        raw_path: "incident_context/04_person_in_water/description.txt",
+        incident_classification: { case_type: "person_in_water", confidence: "medium" },
+        time_context: { report_time_local: "18:21 PDT", time_since_incident: "unknown" },
+        location_context: {
+          lat: 36.6219, lon: -121.9066,
+          relative_description: "~3 NM northwest of Monterey Harbor",
+          offshore: true, distance_from_shore_nm: 3.0, navigational_zone: "open_coastal_water"
+        }
+      },
+      {
+        _id: "05_suspicious_vessel_activity",
+        source: "incident_context/05_suspicious_vessel_activity/description.txt",
+        structured_path: "structured_outputs/05_suspicious_vessel_activity.json",
+        raw_path: "incident_context/05_suspicious_vessel_activity/description.txt",
+        incident_classification: { case_type: "suspicious_activity", confidence: "medium" },
+        time_context: { report_time_local: "23:36 PDT", time_since_incident: "unknown" },
+        location_context: {
+          lat: 33.7169, lon: -118.2817,
+          relative_description: "~1.5 NM south of Angels Gate",
+          offshore: true, distance_from_shore_nm: 1.5, navigational_zone: "open_coastal_water"
+        }
+      }
+    ];
+
+    let incidents = DEFAULT_INCIDENTS.map(i => ({ ...i }));
+    let structuredCache = {};
+    let rawCache = {};
+    let map;
+    let markers = [];
+    let selectedId = null;
+
+    const get = id => document.getElementById(id);
+
+    function confidenceClass(conf) {
+      if (conf === "high") return "conf-high";
+      if (conf === "medium") return "conf-medium";
+      return "conf-low";
+    }
+
+    function makeMarker(incident) {
+      const conf = incident?.incident_classification?.confidence || "unknown";
+      const icon = L.divIcon({
+        html: `<div class="marker ${confidenceClass(conf)}"></div>`,
+        className: "",
+        iconSize: [16, 16]
+      });
+      const lat = incident?.location_context?.lat;
+      const lon = incident?.location_context?.lon;
+      if (typeof lat !== "number" || typeof lon !== "number") return null;
+      const m = L.marker([lat, lon], { icon });
+      const ct = incident?.incident_classification?.case_type || "Unknown";
+      m.bindTooltip(`${ct} · ${conf}`);
+      m.on("click", () => {
+        structuredCache = {};
+        rawCache = {};
+        get("stage2-overview").innerHTML = "Select an incident to view situational context.";
+        ["temporal-panel","factors-panel","constraints-panel","scenarios-panel"].forEach(id => {
+          const el = get(id);
+          if (el) el.innerHTML = `<div class="state-msg">No data.</div>`;
+        });
+        const nano = get("nano-output");
+        if (nano) nano.textContent = "Select a scenario to visualize.";
+        const grounding = get("grounding-raw");
+        if (grounding) grounding.textContent = "";
+        selectedId = incident._id;
+        runExtraction(incident);
+      });
+      return m;
+    }
+
+    function renderMap() {
+      if (!map) {
+        map = L.map("map", { zoomControl: true });
+        map.setView([37.5, -122], 4);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+      }
+      markers.forEach(m => m.remove());
+      markers = [];
+      const bounds = [];
+      incidents.forEach(inc => {
+        const marker = makeMarker(inc);
+        if (marker) {
+          marker.addTo(map);
+          markers.push(marker);
+          bounds.push(marker.getLatLng());
+        }
+      });
+      if (bounds.length) {
+        map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30] });
+      }
+    }
+
+    function fmt(val, fallback = "Unknown") {
+      if (val === null || val === undefined || val === "") return fallback;
+      return val;
+    }
+
+    function renderTemporal(temporal = []) {
+      if (!temporal.length) return `<div class="state-msg">No temporal signals.</div>`;
+      return temporal.map(t =>
+        `<div class="row">
+          <div>${fmt(t.signal)}</div>
+          <div class="value">${fmt(t.confidence)}</div>
+        </div>`
+      ).join("");
+    }
+
+    function renderFactors(factors = []) {
+      if (!factors.length) return `<div class="state-msg">No situational factors.</div>`;
+      return factors.map(f => {
+        const tooltip = f.factor === "nighttime_operations"
+          ? "Nighttime operations → reduced visual confirmation"
+          : f.factor === "nearshore_open_water"
+          ? "Nearshore open water → transitional navigation zone"
+          : "";
+        return `<div class="row" title="${tooltip}">
+          <div>${fmt(f.factor)}</div>
+          <div class="value">${fmt(f.severity)}</div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderConstraints(constraints = []) {
+      if (!constraints.length) return `<div class="state-msg">No constraints.</div>`;
+      return constraints.map(c =>
+        `<div class="flag">⛔ ${fmt(c.constraint)}</div>`
+      ).join(" ");
+    }
+
+    function renderScenarios(scenarios = []) {
+      if (!scenarios.length) return `<div class="state-msg">No scenarios.</div>`;
+      return scenarios.map((s) =>
+        `<label class="check-item">
+          <input type="radio" name="scenario" data-scenario="${s.scenario}">
+          ${fmt(s.scenario)}
+        </label>`
+      ).join("");
+    }
+
+    function renderStage2Overview(payload) {
+      if (!payload) return "Select an incident to view situational context.";
+      const ic = payload?.structured?.incident_classification || payload?.incident_classification || {};
+      const loc = payload?.structured?.location_context || payload?.location_context || {};
+      const temporal = payload?.temporal || [];
+      const factors = payload?.situational_factors || [];
+      const signals = temporal.map(t => t.signal).join(", ") || "No temporal signals";
+      const factorText = factors.map(f => f.factor).join(", ") || "No situational factors";
+      return `
+        <div class="row"><div class="label">Case</div><div class="value">${fmt(ic.case_type)}</div></div>
+        <div class="row"><div class="label">Confidence</div><div class="value">${fmt(ic.confidence)}</div></div>
+        <div class="row"><div class="label">Zone</div><div class="value">${fmt(loc.navigational_zone)}</div></div>
+        <div class="row"><div class="label">Temporal</div><div class="value">${signals}</div></div>
+        <div class="row"><div class="label">Factors</div><div class="value">${factorText}</div></div>
+      `;
+    }
+
+    async function loadGrounding(inc) {
+      const container = get("grounding-raw");
+      if (!container) return;
+      if (!inc) {
+        container.textContent = "";
+        return;
+      }
+      if (rawCache[inc._id]) {
+        container.textContent = rawCache[inc._id];
+        return;
+      }
+      if (inc.raw_path) {
+        try {
+          const url = `${API_ROOT}/raw?source_path=${encodeURIComponent(inc.raw_path)}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            const txt = data.text || "";
+            rawCache[inc._id] = txt;
+            container.textContent = txt;
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to load raw report", e);
+        }
+      }
+      container.textContent = "No raw report available.";
+    }
+
+    function renderDetailsFromStructured(inc) {
+      const container = get("details-content");
+      if (!container) return;
+      if (!inc) {
+        container.innerHTML = "Select an incident on the map to view details.";
+        return;
+      }
+      const hdr = inc.incident_classification || {};
+      const loc = inc.location_context || {};
+      const time = inc.time_context || {};
+      const ctl = inc.control_state || {};
+      const env = inc.environment || {};
+      const obs = inc.observations || {};
+      const risk = inc.human_risk_context || {};
+      const primary = inc.primary_risk_vectors || [];
+      const uncertainties = inc.uncertainties || [];
+      const prohibited = inc.prohibited_inferences || [];
+
+      const riskList = primary.map((r, idx) => {
+        return `<li><div><strong>${fmt(r.risk_type)}</strong></div><div>Driver: ${fmt(r.driver)}</div><div>Severity: ${fmt(r.severity)}</div></li>`;
+      }).join("") || "<li>No risk vectors provided</li>";
+
+      const debrisTypes = (obs.debris_types || []).map(t => `<li>${t}</li>`).join("") || "<li>None listed</li>";
+      const uncertList = uncertainties.map(u => `<div class="check-item"><input type="checkbox" disabled><span>${u}</span></div>`).join("") || `<div class="check-item"><input type="checkbox" disabled><span>No uncertainties provided</span></div>`;
+      const prohibitedList = prohibited.map(p => `<li>${p}</li>`).join("") || "<li>None provided</li>";
+
+      const stabilityFlag = ctl.stability_compromised === true ? `<div class="flag"><span class="icon">⚠</span><span>Stability Compromised: Yes</span></div>` : "";
+      const hypoFlag = risk.hypothermia_risk === true ? `<div class="flag"><span class="icon">⚠</span><span>Hypothermia Risk: Yes</span></div>` : "";
+      const windDir = env.wind?.direction || "unknown";
+      const windSpeed = env.wind?.speed_kts || "unknown";
+
+      container.innerHTML = `
+        <div class="section">
+          <h3 style="margin:0;">Incident Header</h3>
+          <div class="row"><div class="label">Case Type</div><div class="value">${fmt(hdr.case_type)}</div></div>
+          <div class="row"><div class="label">Confidence</div><div class="value">${fmt(hdr.confidence)}</div></div>
+          <div class="row"><div class="label">Report Time</div><div class="value">${fmt(time.report_time_local)}</div></div>
+        </div>
+
+        <div class="section">
+          <h3>Location Context</h3>
+          <div class="row"><div class="label">Location</div><div class="value">${fmt(loc.relative_description)}</div></div>
+          <div class="row"><div class="label">Lat</div><div class="value">${fmt(loc.lat)}</div></div>
+          <div class="row"><div class="label">Lon</div><div class="value">${fmt(loc.lon)}</div></div>
+          <div class="row"><div class="label">Offshore</div><div class="value">${loc.offshore === true ? "Yes" : loc.offshore === false ? "No" : "Unknown"}</div></div>
+          <div class="row"><div class="label">Distance from shore (NM)</div><div class="value">${fmt(loc.distance_from_shore_nm)}</div></div>
+          <div class="row"><div class="label">Navigational Zone</div><div class="value">${fmt(loc.navigational_zone)}</div></div>
+        </div>
+
+        <div class="section">
+          <h3>Time Context</h3>
+          <div class="row"><div class="label">Reported at</div><div class="value">${fmt(time.report_time_local)}</div></div>
+          <div class="row"><div class="label">Time since incident</div><div class="value">${fmt(time.time_since_incident)}</div></div>
+        </div>
+
+        <div class="section">
+          <h3>Control State</h3>
+          <div class="row"><div class="label">Maneuverable</div><div class="value">${fmt(ctl.maneuverable)}</div></div>
+          <div class="row"><div class="label">Propulsion status</div><div class="value">${fmt(ctl.propulsion_status)}</div></div>
+          <div class="row"><div class="label">Stability compromised</div><div class="value">${ctl.stability_compromised === true ? "Yes" : ctl.stability_compromised === false ? "No" : "Unknown"}</div></div>
+          ${stabilityFlag}
+        </div>
+
+        <div class="section">
+          <h3>Environmental Conditions</h3>
+          <div class="row"><div class="label">Sea state</div><div class="value">${fmt(env.sea_state_ft)}</div></div>
+          <div class="row"><div class="label">Wave period</div><div class="value">${fmt(env.wave_period)}</div></div>
+          <div class="row"><div class="label">Wind</div><div class="value">${fmt(windSpeed)} kts (direction ${fmt(windDir)})</div></div>
+          <div class="row"><div class="label">Visibility</div><div class="value">${fmt(env.visibility)}</div></div>
+          <div class="row"><div class="label">Water temperature</div><div class="value">${env.water_temp_f != null ? env.water_temp_f + "°F" : "Unknown"}</div></div>
+        </div>
+
+        <div class="section">
+          <h3>Observations</h3>
+          <div class="row"><div class="label">Debris observed</div><div class="value">${obs.debris_observed === true ? "Yes" : obs.debris_observed === false ? "No" : "Unknown"}</div></div>
+          <div class="list-label">Debris types</div>
+          <ul>${debrisTypes}</ul>
+          <div class="row"><div class="label">Persons visible</div><div class="value">${obs.persons_visible === true ? "Yes" : obs.persons_visible === false ? "No" : "Unknown"}</div></div>
+        </div>
+
+        <div class="section">
+          <h3>Human Risk Context</h3>
+          <div class="row"><div class="label">Occupant count</div><div class="value">${fmt(risk.occupant_count)}</div></div>
+          <div class="row"><div class="label">Children present</div><div class="value">${fmt(risk.children_present)}</div></div>
+          <div class="row"><div class="label">Hypothermia risk</div><div class="value">${risk.hypothermia_risk === true ? "Yes" : risk.hypothermia_risk === false ? "No" : "Unknown"}</div></div>
+          ${hypoFlag}
+        </div>
+
+        <div class="section">
+          <h3>Explicit Uncertainties</h3>
+          <div class="list-label">Unresolved Information</div>
+          <div class="checklist">${uncertList}</div>
+        </div>
+
+        <div class="section">
+          <h3>Prohibited Inferences</h3>
+          <ul>${prohibitedList}</ul>
+        </div>
+      `;
+
+    }
+
+    async function fetchAnalyzed(incident) {
+      let analyzed = null;
+      // Try live stage 2 analysis if endpoint configured
+      if (ANALYZE_ENDPOINT) {
+        try {
+          const res = await fetch(ANALYZE_ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ source_path: incident.source })
+          });
+          if (res.ok) {
+            analyzed = await res.json();
+          }
+        } catch (e) {
+          console.error("Analyze endpoint failed, falling back to cached output", e);
+        }
+      }
+      // Fallback to pre-generated structured output only (no stage 2)
+      if (!analyzed) {
+        try {
+          const res = await fetch(incident.structured_path);
+          if (res.ok) {
+            const structured = await res.json();
+            analyzed = {
+              source_path: incident.source,
+              structured,
+              temporal: [],
+              situational_factors: [],
+              operational_constraints: [],
+              scenarios: []
+            };
+          }
+        } catch (e) {
+          console.error("Failed to load structured output", e);
+        }
+      }
+      return analyzed;
+    }
+
+    async function runExtraction(incident) {
+      loadGrounding(incident);
+      const details = get("details-content");
+      if (details) details.textContent = "Running analysis…";
+      const analyzed = await fetchAnalyzed(incident);
+      if (!analyzed) {
+        if (details) details.textContent = "No data available.";
+        return;
+      }
+      // harmonize shape
+      const structured = analyzed.result ? analyzed.result : (analyzed.structured || analyzed);
+      const temporal = analyzed.temporal || [];
+      const factors = analyzed.situational_factors || [];
+      const constraints = analyzed.operational_constraints || [];
+      const scenarios = analyzed.scenarios || [];
+
+      structuredCache[incident._id] = {
+        structured,
+        temporal,
+        situational_factors: factors,
+        operational_constraints: constraints,
+        scenarios
+      };
+
+      // Stage 2 panels
+      get("temporal-panel").innerHTML = renderTemporal(temporal);
+      get("factors-panel").innerHTML = renderFactors(factors);
+      get("constraints-panel").innerHTML = renderConstraints(constraints);
+      get("scenarios-panel").innerHTML = renderScenarios(scenarios);
+      get("stage2-overview").innerHTML = renderStage2Overview({ structured, temporal, situational_factors: factors });
+
+      // Grounding panel stays collapsed until toggled
+      if (details) {
+        details.innerHTML = `<span class="state-pill">Situational context only — no assessment or recommendations.</span>`;
+      }
+    }
+
+    function resetToDefault() {
+      incidents = DEFAULT_INCIDENTS.map(i => ({ ...i }));
+      selectedId = null;
+      structuredCache = {};
+      rawCache = {};
+      renderMap();
+      get("stage2-overview").innerHTML = "Select an incident to view situational context.";
+      ["temporal-panel","factors-panel","constraints-panel","scenarios-panel"].forEach(id => {
+        const el = get(id);
+        if (el) el.innerHTML = `<div class="state-msg">No data.</div>`;
+      });
+      const details = get("details-content");
+      if (details) details.textContent = "Select an incident on the map to view details.";
+      const nano = get("nano-output");
+      if (nano) nano.textContent = "Select a scenario to visualize.";
+      const grounding = get("grounding-raw");
+      if (grounding) grounding.textContent = "";
+    }
+
+    function setupControls() {
+      const reloadBtn = get("reload-btn");
+      if (reloadBtn) reloadBtn.addEventListener("click", resetToDefault);
+      const copyBtn = get("copy-json");
+      if (copyBtn) {
+        copyBtn.addEventListener("click", async () => {
+          const inc = structuredCache[selectedId];
+          if (!inc) return;
+          await navigator.clipboard.writeText(JSON.stringify(inc, null, 2));
+        });
+      }
+      const analysisBtn = get("run-extract-btn");
+      if (analysisBtn) {
+        analysisBtn.addEventListener("click", () => {
+          const details = get("details-content");
+          if (details) details.style.display = "block";
+          // Download disabled per request; this button now simply keeps the panel visible.
+        });
+      }
+      document.addEventListener("change", (e) => {
+        if (e.target && e.target.name === "scenario") {
+          const scenario = e.target.dataset.scenario;
+          const nano = get("nano-output");
+          if (nano) {
+            nano.textContent = scenario
+              ? `Rendering hypothetical visualization for: ${scenario}`
+              : "Select a scenario to visualize.";
+          }
+        }
+      });
+    }
+
+    window.addEventListener("load", () => {
+      setupControls();
+      resetToDefault();
+    });
+  </script>
+</body>
+</html>

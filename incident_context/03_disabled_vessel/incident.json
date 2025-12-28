@@ -1,0 +1,15 @@
+{
+  "case_type": "disabled_vessel",
+  "lat": 37.8041,
+  "lon": -122.6402,
+  "time_local": "13:48",
+  "location_note": "~2.5 NM west of Golden Gate Bridge",
+  "environment": {
+    "sea_state_ft": "2-3",
+    "wind_kts": 15,
+    "traffic_density": "high",
+    "visibility": "excellent"
+  },
+  "indicators": ["loss_of_propulsion", "drift_toward_shipping_lanes"],
+  "uncertainties": ["drift_rate", "anchor_status", "mechanical_condition"]
+}

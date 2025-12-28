@@ -1,0 +1,29 @@
+Suspicious / Anomalous Maritime Activity
+
+Location:
+Approximately 1.5 NM south of Angels Gate, near the Port of LA / Long Beach harbor approaches.
+
+Trigger:
+Radar contact and visual observation at 2336 PST by shore-based watchstanders.
+
+Report:
+- Small motorized vessel loitering near the harbor entrance.
+- No AIS signal detected.
+- Repeated erratic course changes observed over several minutes.
+- Vessel maintained forward propulsion throughout observation.
+
+Environmental snapshot:
+- Seas calm (≤1 ft).
+- Wind light.
+- Visibility good.
+- Commercial and recreational traffic light.
+
+Observations:
+- No floating debris observed.
+- No persons visible from observation point.
+- Vessel appeared upright with no visible signs of distress.
+
+Uncertainties:
+- Exact vessel type.
+- Number of occupants onboard.
+- Operator intent.

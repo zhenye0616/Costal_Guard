@@ -1,0 +1,15 @@
+{
+  "case_type": "recreational_vessel_distress",
+  "lat": 34.4062,
+  "lon": -119.8783,
+  "time_local": "16:42",
+  "location_note": "~4 NM south of Coal Oil Point, CA",
+  "environment": {
+    "sea_state_ft": "4-5",
+    "wind_kts": "12-15",
+    "visibility": "good",
+    "water_temp_f": 56
+  },
+  "indicators": ["floating_debris"],
+  "uncertainties": ["persons_in_water", "occupant_count", "vessel_orientation", "time_since_incident"]
+}

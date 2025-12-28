@@ -1,0 +1,18 @@
+Overloaded / Unlit Small Vessel (Migrant Interdiction)
+Location: ~6 NM west of Point Loma, San Diego
+Trigger: CBP ASI FLIR cue at 0217 PST
+
+Report:
+- Small open-hulled vessel, no lights, low freeboard
+- Rough count 18–22 heat signatures
+- Slow northbound movement
+
+Environmental snapshot:
+- Seas 3–4 ft
+- Wind NW 10–15 kts
+- Moon/lighting: low illumination
+
+Uncertainties:
+- Exact passenger count
+- Vessel condition
+- Presence of minors

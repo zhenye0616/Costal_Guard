@@ -1,0 +1,19 @@
+Person in the Water / Possible Fall Overboard
+Location: ~3 NM northwest of Monterey Harbor (Monterey Bay)
+Trigger: Vessel radio call at 1821 PST
+
+Report:
+- Believed someone went overboard; time uncertain
+- Lost visual
+- No visual contact at scene
+
+Environmental snapshot:
+- Seas 3–4 ft
+- Wind NW 10 kts
+- Water temp ~54°F
+- Visibility moderate
+
+Uncertainties:
+- Time last seen
+- PFD worn
+- Drift direction

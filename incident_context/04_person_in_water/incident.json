@@ -1,0 +1,15 @@
+{
+  "case_type": "person_in_water",
+  "lat": 36.6219,
+  "lon": -121.9066,
+  "time_local": "18:21",
+  "location_note": "~3 NM northwest of Monterey Harbor",
+  "environment": {
+    "sea_state_ft": "3-4",
+    "water_temp_f": 54,
+    "wind_kts": 10,
+    "visibility": "moderate"
+  },
+  "indicators": ["possible_overboard", "no_visual_contact"],
+  "uncertainties": ["time_last_seen", "pfd_status", "drift_direction"]
+}

@@ -1,0 +1,71 @@
+{
+  "incident_classification": {
+    "case_type": "suspicious_activity",
+    "confidence": "medium"
+  },
+  "time_context": {
+    "report_time_local": "23:36 PDT",
+    "time_since_incident": "unknown"
+  },
+  "location_context": {
+    "lat": 33.7169,
+    "lon": -118.2817,
+    "relative_description": "~1.5 NM south of Angels Gate",
+    "offshore": true,
+    "distance_from_shore_nm": 1.5,
+    "navigational_zone": "open_coastal_water"
+  },
+  "control_state": {
+    "maneuverable": "unknown",
+    "stability_compromised": false,
+    "propulsion_status": "unknown"
+  },
+  "environment": {
+    "sea_state_ft": "calm",
+    "wave_period": "unknown",
+    "wind": {
+      "direction": "unknown",
+      "speed_kts": "unknown"
+    },
+    "visibility": "good",
+    "water_temp_f": null
+  },
+  "observations": {
+    "debris_observed": false,
+    "debris_types": [],
+    "persons_visible": false
+  },
+  "human_risk_context": {
+    "occupant_count": "unknown",
+    "children_present": "unknown",
+    "hypothermia_risk": false
+  },
+  "primary_risk_vectors": [
+    {
+      "risk_type": "potential_illicit_activity",
+      "driver": "erratic_course, no_ais",
+      "severity": "medium"
+    }
+  ],
+  "uncertainties": [
+    "children_present",
+    "intent",
+    "maneuverable",
+    "occupant_count",
+    "persons_visible",
+    "propulsion_status",
+    "report_time_timezone",
+    "time_since_incident",
+    "vessel_type",
+    "water_temp_f",
+    "wave_period",
+    "wind_direction",
+    "wind_speed_kts"
+  ],
+  "prohibited_inferences": [
+    "causes",
+    "intent",
+    "outcomes",
+    "safety"
+  ]
+}

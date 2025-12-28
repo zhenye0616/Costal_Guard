@@ -1,0 +1,15 @@
+{
+  "case_type": "suspicious_vessel_activity",
+  "lat": 33.7169,
+  "lon": -118.2817,
+  "time_local": "23:36",
+  "location_note": "~1.5 NM south of Angels Gate",
+  "environment": {
+    "sea_state_ft": "calm",
+    "visibility": "good",
+    "traffic": "light",
+    "wind": "light"
+  },
+  "indicators": ["erratic_course", "no_ais"],
+  "uncertainties": ["intent", "occupant_count", "vessel_type"]
+}

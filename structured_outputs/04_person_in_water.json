@@ -1,0 +1,81 @@
+{
+  "incident_classification": {
+    "case_type": "person_in_water",
+    "confidence": "medium"
+  },
+  "time_context": {
+    "report_time_local": "18:21 PDT",
+    "time_since_incident": "unknown"
+  },
+  "location_context": {
+    "lat": 36.6219,
+    "lon": -121.9066,
+    "relative_description": "~3 NM northwest of Monterey Harbor",
+    "offshore": true,
+    "distance_from_shore_nm": 3.0,
+    "navigational_zone": "open_coastal_water"
+  },
+  "control_state": {
+    "maneuverable": "unknown",
+    "stability_compromised": false,
+    "propulsion_status": "unknown"
+  },
+  "environment": {
+    "sea_state_ft": "3-4",
+    "wave_period": "unknown",
+    "wind": {
+      "direction": "unknown",
+      "speed_kts": "10"
+    },
+    "visibility": "unknown",
+    "water_temp_f": 54
+  },
+  "observations": {
+    "debris_observed": false,
+    "debris_types": [],
+    "persons_visible": false
+  },
+  "human_risk_context": {
+    "occupant_count": "unknown",
+    "children_present": "unknown",
+    "hypothermia_risk": true
+  },
+  "primary_risk_vectors": [
+    {
+      "risk_type": "hypothermia",
+      "driver": "cold water / person in water",
+      "severity": "high"
+    },
+    {
+      "risk_type": "loss_of_control",
+      "driver": "possible_overboard",
+      "severity": "high"
+    },
+    {
+      "risk_type": "unknown",
+      "driver": "lack of visual contact",
+      "severity": "medium"
+    }
+  ],
+  "uncertainties": [
+    "children_present",
+    "confidence_downgraded_due_to_insufficient_corroboration",
+    "drift_direction",
+    "maneuverable",
+    "occupant_count",
+    "pfd_status",
+    "propulsion_status",
+    "report_time_timezone",
+    "time_last_seen",
+    "time_since_incident",
+    "visibility",
+    "wave_period",
+    "wind_direction"
+  ],
+  "prohibited_inferences": [
+    "causes",
+    "intent",
+    "outcomes",
+    "safety"
+  ]
+}
