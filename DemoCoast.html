@@ -207,8 +207,9 @@
   <script>
     // Optional: point this to a backend extractor; fallback uses precomputed structured outputs.
     const API_ROOT = "http://localhost:8000";
-    const ANALYZE_ENDPOINT = `${API_ROOT}/analyze`;
-    const NANOBANANA_ENDPOINT = `${API_ROOT}/nanobanana/generate`;
+    const PROCESS_ENDPOINT = `${API_ROOT}/process-incident`;
+    const VISUALIZE_ENDPOINT = `${API_ROOT}/generate-visualization`;
+    const resolveAssetUrl = (path) => `${API_ROOT}/${path.replace(/^\/+/, "")}`;
 
     const DEFAULT_INCIDENTS = [
       {
@@ -284,6 +285,7 @@
     let map;
     let markers = [];
     let selectedId = null;
+    let analysisError = "";
 
     const get = id => document.getElementById(id);
 
@@ -309,6 +311,7 @@
       m.on("click", () => {
         structuredCache = {};
         rawCache = {};
+        analysisError = "";
         get("stage2-overview").innerHTML = "Select an incident to view situational context.";
         ["temporal-panel","factors-panel","constraints-panel","scenarios-panel"].forEach(id => {
           const el = get(id);
@@ -319,6 +322,8 @@
         const grounding = get("grounding-raw");
         if (grounding) grounding.textContent = "";
         selectedId = incident._id;
+        const details = get("details-content");
+        if (details) details.textContent = `Selected ${incident._id}. Loading analysis...`;
         runExtraction(incident);
       });
       return m;
@@ -425,11 +430,9 @@
       }
       if (inc.raw_path) {
         try {
-          const url = `${API_ROOT}/raw?source_path=${encodeURIComponent(inc.raw_path)}`;
-          const res = await fetch(url);
+          const res = await fetch(resolveAssetUrl(inc.raw_path));
           if (res.ok) {
-            const data = await res.json();
-            const txt = data.text || "";
+            const txt = await res.text();
             rawCache[inc._id] = txt;
             container.textContent = txt;
             return;
@@ -546,24 +549,35 @@
     async function fetchAnalyzed(incident) {
       let analyzed = null;
       // Try live stage 2 analysis if endpoint configured
-      if (ANALYZE_ENDPOINT) {
+      if (PROCESS_ENDPOINT) {
         try {
-          const res = await fetch(ANALYZE_ENDPOINT, {
+          const sourceRes = await fetch(resolveAssetUrl(incident.source));
+          if (!sourceRes.ok) {
+            throw new Error(`Incident source HTTP ${sourceRes.status}`);
+          }
+          const blob = await sourceRes.blob();
+          const filename = incident.source.split("/").pop() || "incident.txt";
+          const form = new FormData();
+          form.append("incident_text", new File([blob], filename, { type: "text/plain" }));
+
+          const res = await fetch(PROCESS_ENDPOINT, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ source_path: incident.source })
+            body: form
           });
           if (res.ok) {
             analyzed = await res.json();
+          } else if (res.status === 422) {
+            analysisError = "Extraction rejected by pipeline; using cached analysis if available.";
           }
         } catch (e) {
           console.error("Analyze endpoint failed, falling back to cached output", e);
+          analysisError = e instanceof Error ? e.message : String(e);
         }
       }
       // Fallback to pre-generated structured output only (no stage 2)
       if (!analyzed) {
         try {
-          const res = await fetch(incident.structured_path);
+          const res = await fetch(resolveAssetUrl(incident.structured_path));
           if (res.ok) {
             const structured = await res.json();
             analyzed = {
@@ -574,9 +588,13 @@
               operational_constraints: [],
               scenarios: []
             };
+            analysisError = "";
           }
         } catch (e) {
           console.error("Failed to load structured output", e);
+          if (!analysisError) {
+            analysisError = e instanceof Error ? e.message : String(e);
+          }
         }
       }
       return analyzed;
@@ -591,13 +609,14 @@
       }
       const overlay = result.overlay_label || "Plausible Scenario Visualization — Hypothetical · Not Evidence · Not Ground Truth";
       const imgs = (result.gemini_images || []).filter(i => i.image_base64);
+      const modelLabel = result.image_model_used || result.image_model_requested || "";
       const imgHtml = imgs.length
         ? imgs.map(i => `<img class="nano-image" alt="NanoBanana render ${i.index}" src="data:${i.mime_type || "image/png"};base64,${i.image_base64}">`).join("")
         : "<div class=\"state-msg\">No images returned.</div>";
       nano.innerHTML = `
         <div class="overlay-label">${overlay}</div>
         <div class="nano-meta">Scenario: ${result.selected_scenario || ""}</div>
-        <div class="nano-meta">Model: ${result.gemini_model || ""}</div>
+        <div class="nano-meta">Model: ${modelLabel}</div>
         <div class="nano-images">${imgHtml}</div>
       `;
     }
@@ -620,10 +639,20 @@
       }
 
       try {
-        const res = await fetch(NANOBANANA_ENDPOINT, {
+        const payload = {
+          structured: structuredCache[selectedId].structured,
+          temporal: structuredCache[selectedId].temporal,
+          situational_factors: structuredCache[selectedId].situational_factors,
+          operational_constraints: structuredCache[selectedId].operational_constraints,
+          scenarios: structuredCache[selectedId].scenarios
+        };
+        const form = new FormData();
+        form.append("analysis_data", JSON.stringify(payload));
+        form.append("selected_scenario", scenario);
+
+        const res = await fetch(VISUALIZE_ENDPOINT, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source_path: incident.source, scenario })
+          body: form
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -640,7 +669,11 @@
       if (details) details.textContent = "Running analysis…";
       const analyzed = await fetchAnalyzed(incident);
       if (!analyzed) {
-        if (details) details.textContent = "No data available.";
+        if (details) {
+          details.textContent = analysisError
+            ? `Analysis unavailable. ${analysisError}`
+            : "No data available.";
+        }
         return;
       }
       // harmonize shape

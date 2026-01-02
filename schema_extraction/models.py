@@ -18,6 +18,7 @@ from .constants import (
 # Incident Classification
 # -------------------------
 
+
 class IncidentClassification(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

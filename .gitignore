@@ -20,3 +20,6 @@ structured_outputs/*.tmp
 
 #debug folder
 image_generation_debug/
+
+#.md files
+*.md

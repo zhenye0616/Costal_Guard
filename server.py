@@ -1,10 +1,13 @@
+import json
 import logging
 import os
-from typing import Any
+from io import BytesIO
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.staticfiles import StaticFiles
+from PIL import Image
 
 from schema_extraction.pipeline import extract_structured
 from incident_analysis.temporal import derive_temporal
@@ -17,8 +20,7 @@ from nanobanana.models import normalize_image_model
 from utils import (
     call_image_generation,
     extract_lat_lon,
-    load_cached_structured,
-    load_incident_json,
+    geocode_location,
 )
 
 logging.basicConfig(
@@ -27,6 +29,7 @@ logging.basicConfig(
 )
 
 app = FastAPI(title="USCG Incident Extraction API", version="1.0.0")
+BASE_DIR = Path(__file__).resolve().parent
 
 logger = logging.getLogger(__name__)
 
@@ -37,23 +40,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# -----------------------------------------------------------------------------
-# Request Models
-# -----------------------------------------------------------------------------
-
-class ExtractRequest(BaseModel):
-    source_path: str
+app.mount("/incident_context", StaticFiles(directory=BASE_DIR / "incident_context"), name="incident_context")
+app.mount("/structured_outputs", StaticFiles(directory=BASE_DIR / "structured_outputs"), name="structured_outputs")
 
 
-class RawRequest(BaseModel):
-    source_path: str
+MAX_TEXT_FILE_SIZE = 1 * 1024 * 1024  # 1 MB
+MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 
 
-class NanoBananaRequest(BaseModel):
-    source_path: str
-    scenario: str
-    model: str | None = None  # ← allow legacy / explicit model requests
+async def validate_and_read_text_file(file: UploadFile) -> str:
+    if not file.filename or not file.filename.lower().endswith(".txt"):
+        raise HTTPException(status_code=400, detail="incident_text must be a .txt file")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="incident_text file is empty")
+    if len(raw) > MAX_TEXT_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="incident_text file too large")
+
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="incident_text must be UTF-8 encoded")
+
+
+async def validate_and_convert_image(file: UploadFile) -> Image.Image:
+    if not file.content_type or file.content_type.lower() not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="incident_image must be a valid image type")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="incident_image file is empty")
+    if len(raw) > MAX_IMAGE_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="incident_image file too large")
+
+    try:
+        img = Image.open(BytesIO(raw))
+    except Exception:
+        raise HTTPException(status_code=400, detail="incident_image could not be decoded")
+
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    return img
+
+
+def extract_location_query(text: str) -> str | None:
+    for line in text.splitlines():
+        if ":" in line and line.strip().lower().startswith("location"):
+            _, value = line.split(":", 1)
+            candidate = value.strip()
+            if candidate:
+                return candidate
+    return None
+
+
+def append_coordinates(text: str, lat: float, lon: float) -> str:
+    return f"{text}\n\nCoordinates: {lat:.6f}, {lon:.6f}\n"
 
 
 # Routes
@@ -64,29 +107,30 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.get("/raw")
-def raw_text(source_path: str) -> Any:
-    text, _ = load_incident_json(source_path)
-    return {"source_path": source_path, "text": text}
+@app.post("/process-incident")
+async def process_incident(
+    incident_text: UploadFile = File(...),
+    incident_image: UploadFile | None = File(None),
+) -> dict:
+    text = await validate_and_read_text_file(incident_text)
+    has_incident_image = False
+    if incident_image is not None:
+        img = await validate_and_convert_image(incident_image)
+        has_incident_image = True
+        img.close()
 
+    location_query = extract_location_query(text)
+    if location_query:
+        coords = geocode_location(location_query)
+        if coords is not None:
+            text = append_coordinates(text, coords[0], coords[1])
 
-@app.post("/extract")
-def extract(req: ExtractRequest) -> Any:
-    payload, fmt = load_incident_json(req.source_path)
-    result = extract_structured(payload, source_format=fmt)
-    return {"stage": "stage_1_extraction", "source_path": req.source_path, "result": result}
-
-
-@app.post("/analyze")
-def analyze(req: ExtractRequest) -> Any:
-    payload, fmt = load_incident_json(req.source_path)
-    structured = extract_structured(payload, source_format=fmt)
-
+    structured = extract_structured(text, source_format="txt")
     if isinstance(structured, dict) and structured.get("status") == "rejected":
-        cached = load_cached_structured(req.source_path)
-        if cached is None:
-            return {"stage": "stage_1_extraction", "structured": structured}
-        structured = cached
+        raise HTTPException(
+            status_code=422,
+            detail=structured.get("reason", "stage_1_extraction_rejected"),
+        )
 
     temporal = derive_temporal(structured)
     factors = derive_factors(structured)
@@ -105,31 +149,36 @@ def analyze(req: ExtractRequest) -> Any:
         "situational_factors": factors,
         "operational_constraints": constraints,
         "scenarios": scenarios,
+        "has_incident_image": has_incident_image,
     }
 
 
-@app.post("/nanobanana/generate")
-def nanobanana_generate(req: NanoBananaRequest) -> Any:
-    payload, fmt = load_incident_json(req.source_path)
-    structured = extract_structured(payload, source_format=fmt)
+@app.post("/generate-visualization")
+async def generate_visualization(
+    analysis_data: str = Form(...),
+    selected_scenario: str = Form(...),
+    incident_image: UploadFile | None = File(None),
+    model: str | None = Form(None),
+) -> dict:
+    try:
+        payload = json.loads(analysis_data)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="analysis_data must be valid JSON")
 
-    if isinstance(structured, dict) and structured.get("status") == "rejected":
-        cached = load_cached_structured(req.source_path)
-        if cached is None:
-            raise HTTPException(status_code=422, detail="stage_1_extraction_rejected")
-        structured = cached
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="analysis_data must be a JSON object")
 
-    temporal = derive_temporal(structured)
-    factors = derive_factors(structured)
-    constraints = derive_constraints(structured)
-    scenarios = derive_scenarios(
-        structured_input=structured,
-        temporal_signals=temporal,
-        situational_factors=factors,
-        constraints=constraints,
-    )
+    structured = payload.get("structured")
+    temporal = payload.get("temporal", [])
+    factors = payload.get("situational_factors", [])
+    constraints = payload.get("operational_constraints", [])
+    scenarios = payload.get("scenarios", [])
 
-    if req.scenario not in [s.get("scenario") for s in scenarios if isinstance(s, dict)]:
+    if not isinstance(scenarios, list):
+        raise HTTPException(status_code=400, detail="scenarios must be a list")
+
+    scenario_names = [s.get("scenario") for s in scenarios if isinstance(s, dict)]
+    if selected_scenario not in scenario_names:
         raise HTTPException(status_code=400, detail="Invalid scenario selection")
 
     prompt_bundle = build_visualization_request_from_analyze(
@@ -139,7 +188,7 @@ def nanobanana_generate(req: NanoBananaRequest) -> Any:
             "temporal": temporal,
             "scenarios": scenarios,
         },
-        scenario=req.scenario,
+        scenario=selected_scenario,
     )
     logger.info("Prompt bundle generated", extra={"prompt_bundle": prompt_bundle})
 
@@ -160,25 +209,33 @@ def nanobanana_generate(req: NanoBananaRequest) -> Any:
         if isinstance(img, dict) and img.get("url")
     ]
 
-    requested_model = req.model or "gemini-3-pro-image-preview"
-    model, family = normalize_image_model(requested_model)
+    incident_pil = None
+    if incident_image is not None:
+        incident_pil = await validate_and_convert_image(incident_image)
+
+    requested_model = model or "gemini-3-pro-image-preview"
+    resolved_model, family = normalize_image_model(requested_model)
 
     gemini_images = call_image_generation(
-        model=model,
+        model=resolved_model,
         family=family,
         prompt=prompt_bundle["prompt"],
         context_note=spatial.get("context_note", ""),
         image_urls=image_urls,
+        incident_image=incident_pil,
     )
+
+    if incident_pil is not None:
+        incident_pil.close()
 
     return {
         "stage": "stage_3_scene_simulation",
-        "selected_scenario": req.scenario,
+        "selected_scenario": selected_scenario,
         "prompt": prompt_bundle["prompt"],
         "overlay_label": prompt_bundle["overlay_label"],
         "spatial_context": spatial,
         "image_model_requested": requested_model,
-        "image_model_used": model,
+        "image_model_used": resolved_model,
         "image_model_family": family,
         "gemini_images": gemini_images,
     }

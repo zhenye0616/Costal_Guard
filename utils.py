@@ -25,6 +25,51 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+def _maps_key() -> str | None:
+    key = (
+        os.getenv("GOOGLE_MAPS_API_KEY")
+        or os.getenv("MAPS_API_KEY")
+        or os.getenv("GOOGLE_API_KEY")
+    )
+    if not key or key == "YOUR_KEY":
+        return None
+    return key
+
+
+def geocode_location(query: str) -> Tuple[float, float] | None:
+    if not query:
+        return None
+    api_key = _maps_key()
+    if not api_key:
+        logger.info("Geocoding skipped; missing maps API key")
+        return None
+    try:
+        resp = requests.get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            params={"address": query, "key": api_key},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+        if payload.get("status") != "OK":
+            logger.warning(
+                "Geocoding failed",
+                extra={"status": payload.get("status"), "query": query},
+            )
+            return None
+        results = payload.get("results", [])
+        if not results:
+            return None
+        loc = results[0].get("geometry", {}).get("location", {})
+        lat = loc.get("lat")
+        lon = loc.get("lng")
+        if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+            return float(lat), float(lon)
+    except Exception:
+        logger.exception("Geocoding request failed", extra={"query": query})
+    return None
+
+
 def _safe_write_text(path: Path, content: str) -> None:
     try:
         path.write_text(content, encoding="utf-8")
@@ -126,6 +171,7 @@ def call_image_generation(
     prompt: str,
     context_note: str,
     image_urls: List[str],
+    incident_image: Image.Image | None = None,
 ) -> List[dict]:
     """
     Official Gemini image generation per:
@@ -197,25 +243,46 @@ def call_image_generation(
 
         image_inputs: List[Image.Image] = []
         image_meta: List[Dict[str, Any]] = []
+        if incident_image is not None:
+            if incident_image.mode != "RGB":
+                incident_image = incident_image.convert("RGB")
+            incident_path = debug_dir / "input_incident.png"
+            try:
+                incident_image.save(incident_path, format="PNG")
+            except Exception:
+                logger.exception("Failed to write incident debug image")
+            image_inputs.append(incident_image.copy())
+            image_meta.append(
+                {
+                    "source": "incident_upload",
+                    "type": "spatial_ground_truth",
+                    "file": incident_path.name,
+                    "mode": incident_image.mode,
+                    "size": incident_image.size,
+                }
+            )
         if image_urls:
             logger.info("Fetching context images", extra={"image_url_count": len(image_urls)})
+            map_index = 0
             for url in image_urls:
                 try:
                     resp = requests.get(url, timeout=10)
                     resp.raise_for_status()
                     content_type = resp.headers.get("content-type", "")
                     raw_ext = _infer_ext(content_type)
-                    raw_path = debug_dir / f"input_{len(image_meta)}_raw{raw_ext}"
+                    raw_path = debug_dir / f"input_{map_index}_raw{raw_ext}"
                     _safe_write_bytes(raw_path, resp.content)
 
                     img = Image.open(BytesIO(resp.content))
                     if img.mode not in ("RGB", "L"):
                         img = img.convert("RGB")
                     image_inputs.append(img.copy())
-                    converted_path = debug_dir / f"input_{len(image_meta)}_converted.png"
+                    converted_path = debug_dir / f"input_{map_index}_converted.png"
                     img.save(converted_path, format="PNG")
                     image_meta.append(
                         {
+                            "source": "google_maps",
+                            "index": map_index,
                             "url": url,
                             "status_code": resp.status_code,
                             "content_type": content_type,
@@ -227,6 +294,7 @@ def call_image_generation(
                         }
                     )
                     img.close()
+                    map_index += 1
                 except Exception:
                     logger.exception("Failed to fetch context image", extra={"url": url})
                     raise HTTPException(status_code=502, detail="Failed to fetch context imagery")
